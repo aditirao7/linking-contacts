@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from models import SessionLocal, Contact
+from datetime import datetime
 
 app = FastAPI()
 
@@ -19,6 +20,13 @@ async def identify(info: Request):
     # Get request info
     email = req_info['email']
     phoneNumber = req_info['phoneNumber']
+
+    # Insert contact
+    newContact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': None,
+                            'linkPrecedence': 'primary', 'createdAt': datetime.now(), 'updatedAt': datetime.now()})
+    db.add(newContact)
+    db.commit()
+    db.refresh(newContact)
 
     emailList = []
     phoneList = []
