@@ -16,7 +16,13 @@ async def root():
 async def identify(info: Request):
     req_info = await info.json()
 
+    # Get request info
     email = req_info['email']
     phoneNumber = req_info['phoneNumber']
 
-    return JSONResponse({"message": "Contacts API"})
+    emailList = []
+    phoneList = []
+    secondaryContactIds = []
+
+    # Return JSON response
+    return JSONResponse({"contact": {"primaryContactId": None, "emails": emailList, "phoneNumbers": phoneList, "secondaryContactIds": secondaryContactIds}})
