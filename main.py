@@ -118,26 +118,31 @@ async def identify(info: Request):
             phoneList.append(primary.phoneNumber)
             primaryID = primary.id
 
-        # Insert contact only if either phone or email is new
-        # newContact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': None,
-        #                        'linkPrecedence': 'primary', 'createdAt': datetime.now(), 'updatedAt': datetime.now()})
-        # db.add(newContact)
-        # db.commit()
-        # db.refresh(newContact)
-
-        # Checking if primary matches given input
-        # primary = db.query(Contact).filter(or_(Contact.email == email, Contact.phoneNumber ==
-        #                                       phoneNumber), Contact.linkPrecedence == 'primary').first()
-        # if primary is None:
-        #    newContact.linkedId = primary.id
-        #    newContact.linkPrecedence = 'secondary'
-        #    newContact.updatedAt = datetime.now()
-        #    db.add(newContact)
-        #    db.commit()
-
+    # Seen Email/ Phone: Find all linked contacts and output (READ)
     else:
-        # Seen Email/ Phone: Find all linked contacts and output (READ)
-        print()
+        if email:
+            linked = db.query(Contact).filter(Contact.email == email)
+            for contact in linked:
+                if contact.linkPrecedence == 'primary':
+                    primary = contact
+                else:
+                    primary = db.query(Contact).filter(
+                        Contact.id == contact.linkedId).first()
+                    break
+        elif phoneNumber:
+            linked = db.query(Contact).filter(
+                Contact.phoneNumber == phoneNumber)
+            for contact in linked:
+                if contact.linkPrecedence == 'primary':
+                    primary = contact
+                else:
+                    primary = db.query(Contact).filter(
+                        Contact.id == contact.linkedId).first()
+                    break
+        else:
+            return JSONResponse({"message": "Invalid Request!"})
+
+    # Populate output lists
 
     # Return JSON response
     return JSONResponse({"contact": {"primaryContactId": primaryID, "emails": emailList, "phoneNumbers": phoneList, "secondaryContactIds": secondaryContactIds}})
