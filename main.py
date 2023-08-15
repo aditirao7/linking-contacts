@@ -14,6 +14,67 @@ async def root():
     return {"message": "Hello World"}
 
 
+def addContact(phoneNumber, email, linkedId, linkPrecedence):
+    time = datetime.now()
+    contact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': linkedId,
+                         'linkPrecedence': linkPrecedence, 'createdAt': time, 'updatedAt': time})
+    db.add(contact)
+    db.commit()
+    db.refresh(contact)
+    return contact
+
+
+def eitherPhoneOrEmailIsNew(chain, phoneNumber, email):
+    # Check if primary exists in chain
+    primary = chain.filter(
+        Contact.linkPrecedence == 'primary').first()
+    # Else get primary from linkedId
+    if primary is None:
+        primary = db.query(Contact).filter(
+            Contact.id == chain.first().linkedId).first()
+    # Insert
+    addContact(phoneNumber, email, primary.id, 'secondary')
+    return primary
+
+
+def updateOutput(primary, emailList, phoneList, primaryID):
+    emailList.append(primary.email)
+    phoneList.append(primary.phoneNumber)
+    primaryID = primary.id
+    return emailList, phoneList, primaryID
+
+
+def findPrimaryFromChain(chain):
+    primary = chain.filter(
+        Contact.linkPrecedence == 'primary').first()
+    if primary is None:
+        primary = db.query(Contact).filter(
+            Contact.id == chain.first().linkedId).first()
+    return primary
+
+
+def findPrimaryFromLinked(linked):
+    primary = None
+    for contact in linked:
+        if contact.linkPrecedence == 'primary':
+            primary = contact
+        else:
+            primary = db.query(Contact).filter(
+                Contact.id == contact.linkedId).first()
+            break
+    return primary
+
+
+def updateChain(chain, primary):
+    for contact in chain:
+        contact.linkedId = primary.id
+        contact.updatedAt = datetime.now()
+        contact.linkPrecedence = 'secondary'
+        db.add(contact)
+    db.commit()
+    return primary
+
+
 @app.post("/identify")
 async def identify(info: Request):
     req_info = await info.json()
@@ -26,10 +87,13 @@ async def identify(info: Request):
     if 'phoneNumber' in keys:
         phoneNumber = req_info['phoneNumber']
 
+    # Output variables
     emailList = []
     phoneList = []
     secondaryContactIds = []
     primaryID = None
+
+    primary = None
 
     # Algorithm for linking
     # 6 types of valid input: Both New, Both Seen, New Email, New Phone, Seen Email with Null Phone, Seen Phone with Null Email
@@ -45,126 +109,51 @@ async def identify(info: Request):
         # Both New: Insert as primary (CREATE)
         if emailChainSize == 0 and phoneChainSize == 0:
             print(1)
-            newContact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': None,
-                                    'linkPrecedence': 'primary', 'createdAt': datetime.now(), 'updatedAt': datetime.now()})
-            db.add(newContact)
-            db.commit()
-            db.refresh(newContact)
-            emailList.append(email)
-            phoneList.append(phoneNumber)
-            primaryID = newContact.id
-            primary = newContact
+            primary = addContact(phoneNumber, email, None, 'primary')
 
         # New Email: Insert and Link to chain with same phone number (CREATE)
         elif emailChainSize == 0 and phoneChainSize != 0:
             print(2)
-            # Check if primary exists in chain
-            primary = phoneChain.filter(
-                Contact.linkPrecedence == 'primary').first()
-            # Else get primary from linkedId
-            if primary is None:
-                primary = db.query(Contact).filter(
-                    Contact.id == phoneChain.first().linkedId).first()
-            # Insert
-            newContact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': primary.id,
-                                    'linkPrecedence': 'secondary', 'createdAt': datetime.now(), 'updatedAt': datetime.now()})
-            db.add(newContact)
-            db.commit()
-            db.refresh(newContact)
-            emailList.append(primary.email)
-            phoneList.append(primary.phoneNumber)
-            primaryID = primary.id
+            primary = eitherPhoneOrEmailIsNew(phoneChain, phoneNumber, email)
 
         # New Phone: Insert and Link to chain with same email (CREATE)
         elif emailChainSize != 0 and phoneChainSize == 0:
             print(3)
-            # Check if primary exists in chain
-            primary = emailChain.filter(
-                Contact.linkPrecedence == 'primary').first()
-            # Else get primary from linkedId
-            if primary is None:
-                primary = db.query(Contact).filter(
-                    Contact.id == emailChain.first().linkedId).first()
-            # Insert
-            newContact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': primary.id,
-                                    'linkPrecedence': 'secondary', 'createdAt': datetime.now(), 'updatedAt': datetime.now()})
-            db.add(newContact)
-            db.commit()
-            db.refresh(newContact)
-            emailList.append(primary.email)
-            phoneList.append(primary.phoneNumber)
-            primaryID = primary.id
+            primary = eitherPhoneOrEmailIsNew(emailChain, phoneNumber, email)
 
         # Both Seen: Email and phone chains need to be linked, one chain is changed to all secondary by comparing ID (UPDATE)
         else:
             print(4)
-            phonePrimary = phoneChain.filter(
-                Contact.linkPrecedence == 'primary').first()
-            if phonePrimary is None:
-                phonePrimary = db.query(Contact).filter(
-                    Contact.id == phoneChain.first().linkedId).first()
-            emailPrimary = emailChain.filter(
-                Contact.linkPrecedence == 'primary').first()
-            if emailPrimary is None:
-                emailPrimary = db.query(Contact).filter(
-                    Contact.id == emailChain.first().linkedId).first()
+            phonePrimary = findPrimaryFromChain(phoneChain)
+            emailPrimary = findPrimaryFromChain(emailChain)
             # Phone primary is actual primary
             if phonePrimary.id < emailPrimary.id:
-                for contact in emailChain:
-                    contact.linkedId = phonePrimary.id
-                    contact.updatedAt = datetime.now()
-                    contact.linkPrecedence = 'secondary'
-                    db.add(contact)
-                db.commit()
-                primary = phonePrimary
+                primary = updateChain(emailChain, phonePrimary)
             # Email primary is actual primary
             elif phonePrimary.id > emailPrimary.id:
-                for contact in phoneChain:
-                    contact.linkedId = emailPrimary.id
-                    contact.updatedAt = datetime.now()
-                    contact.linkPrecedence = 'secondary'
-                    db.add(contact)
-                db.commit()
-                primary = emailPrimary
+                primary = updateChain(phoneChain, emailPrimary)
             else:
                 primary = emailPrimary
-            emailList.append(primary.email)
-            phoneList.append(primary.phoneNumber)
-            primaryID = primary.id
 
     # Seen Email/ Phone: Find all linked contacts and output (READ)
     else:
-        primary = None
         if email:
             print(5)
             linked = db.query(Contact).filter(Contact.email == email)
-            for contact in linked:
-                if contact.linkPrecedence == 'primary':
-                    primary = contact
-                else:
-                    primary = db.query(Contact).filter(
-                        Contact.id == contact.linkedId).first()
-                    break
+            primary = findPrimaryFromLinked(linked)
         elif phoneNumber:
             print(6)
             linked = db.query(Contact).filter(
                 Contact.phoneNumber == phoneNumber)
-            for contact in linked:
-                if contact.linkPrecedence == 'primary':
-                    primary = contact
-                else:
-                    primary = db.query(Contact).filter(
-                        Contact.id == contact.linkedId).first()
-                    break
+            primary = findPrimaryFromLinked(linked)
         else:
             print(7)
             return JSONResponse({"message": "Invalid Request!"})
-        if primary:
-            primaryID = primary.id
 
     # Populate output lists
     if primary:
         print(8)
+        updateOutput(primary, emailList, phoneList, primaryID)
         linked = db.query(Contact).filter(Contact.linkedId == primary.id)
         for contact in linked:
             if contact.email not in emailList:
