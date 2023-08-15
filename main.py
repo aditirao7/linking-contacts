@@ -144,7 +144,8 @@ async def identify(info: Request):
 
     # Populate output lists
     if primary:
-        updateOutput(primary, emailList, phoneList, primaryID)
+        emailList, phoneList, primaryID = updateOutput(
+            primary, emailList, phoneList, primaryID)
         linked = db.query(Contact).filter(Contact.linkedId == primary.id)
         for contact in linked:
             if contact.email not in emailList:
