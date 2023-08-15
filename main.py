@@ -40,9 +40,11 @@ async def identify(info: Request):
             Contact.phoneNumber == phoneNumber)
         emailChainSize = emailChain.count()
         phoneChainSize = phoneChain.count()
+        print(emailChainSize, phoneChainSize)
 
         # Both New: Insert as primary (CREATE)
         if emailChainSize == 0 and phoneChainSize == 0:
+            print(1)
             newContact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': None,
                                     'linkPrecedence': 'primary', 'createdAt': datetime.now(), 'updatedAt': datetime.now()})
             db.add(newContact)
@@ -51,9 +53,11 @@ async def identify(info: Request):
             emailList.append(email)
             phoneList.append(phoneNumber)
             primaryID = newContact.id
+            primary = newContact
 
         # New Email: Insert and Link to chain with same phone number (CREATE)
-        if emailChainSize == 0 and phoneChainSize != 0:
+        elif emailChainSize == 0 and phoneChainSize != 0:
+            print(2)
             # Check if primary exists in chain
             primary = phoneChain.filter(
                 Contact.linkPrecedence == 'primary').first()
@@ -72,7 +76,8 @@ async def identify(info: Request):
             primaryID = primary.id
 
         # New Phone: Insert and Link to chain with same email (CREATE)
-        if emailChainSize != 0 and phoneChainSize == 0:
+        elif emailChainSize != 0 and phoneChainSize == 0:
+            print(3)
             # Check if primary exists in chain
             primary = emailChain.filter(
                 Contact.linkPrecedence == 'primary').first()
@@ -92,6 +97,7 @@ async def identify(info: Request):
 
         # Both Seen: Email and phone chains need to be linked, one chain is changed to all secondary by comparing ID (UPDATE)
         else:
+            print(4)
             phonePrimary = phoneChain.filter(
                 Contact.linkPrecedence == 'primary').first()
             emailPrimary = emailChain.filter(
@@ -121,6 +127,7 @@ async def identify(info: Request):
     # Seen Email/ Phone: Find all linked contacts and output (READ)
     else:
         if email:
+            print(5)
             linked = db.query(Contact).filter(Contact.email == email)
             for contact in linked:
                 if contact.linkPrecedence == 'primary':
@@ -130,6 +137,7 @@ async def identify(info: Request):
                         Contact.id == contact.linkedId).first()
                     break
         elif phoneNumber:
+            print(6)
             linked = db.query(Contact).filter(
                 Contact.phoneNumber == phoneNumber)
             for contact in linked:
@@ -140,13 +148,17 @@ async def identify(info: Request):
                         Contact.id == contact.linkedId).first()
                     break
         else:
+            print(7)
             return JSONResponse({"message": "Invalid Request!"})
 
     # Populate output lists
+    print(8)
     linked = db.query(Contact).filter(Contact.linkedId == primary.id)
     for contact in linked:
-        emailList.append(contact.email)
-        phoneList.append(contact.phoneNumber)
+        if contact.email not in emailList:
+            emailList.append(contact.email)
+        if contact.phoneNumber not in phoneList:
+            phoneList.append(contact.phoneNumber)
         secondaryContactIds.append(contact.id)
 
     # Return JSON response
