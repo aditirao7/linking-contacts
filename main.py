@@ -100,8 +100,14 @@ async def identify(info: Request):
             print(4)
             phonePrimary = phoneChain.filter(
                 Contact.linkPrecedence == 'primary').first()
+            if phonePrimary is None:
+                phonePrimary = db.query(Contact).filter(
+                    Contact.id == phoneChain.first().linkedId).first()
             emailPrimary = emailChain.filter(
                 Contact.linkPrecedence == 'primary').first()
+            if emailPrimary is None:
+                emailPrimary = db.query(Contact).filter(
+                    Contact.id == emailChain.first().linkedId).first()
             # Phone primary is actual primary
             if phonePrimary.id < emailPrimary.id:
                 for contact in emailChain:
@@ -112,7 +118,7 @@ async def identify(info: Request):
                 db.commit()
                 primary = phonePrimary
             # Email primary is actual primary
-            else:
+            elif phonePrimary.id > emailPrimary.id:
                 for contact in phoneChain:
                     contact.linkedId = emailPrimary.id
                     contact.updatedAt = datetime.now()
@@ -120,12 +126,15 @@ async def identify(info: Request):
                     db.add(contact)
                 db.commit()
                 primary = emailPrimary
+            else:
+                primary = emailPrimary
             emailList.append(primary.email)
             phoneList.append(primary.phoneNumber)
             primaryID = primary.id
 
     # Seen Email/ Phone: Find all linked contacts and output (READ)
     else:
+        primary = None
         if email:
             print(5)
             linked = db.query(Contact).filter(Contact.email == email)
@@ -150,16 +159,19 @@ async def identify(info: Request):
         else:
             print(7)
             return JSONResponse({"message": "Invalid Request!"})
+        if primary:
+            primaryID = primary.id
 
     # Populate output lists
-    print(8)
-    linked = db.query(Contact).filter(Contact.linkedId == primary.id)
-    for contact in linked:
-        if contact.email not in emailList:
-            emailList.append(contact.email)
-        if contact.phoneNumber not in phoneList:
-            phoneList.append(contact.phoneNumber)
-        secondaryContactIds.append(contact.id)
+    if primary:
+        print(8)
+        linked = db.query(Contact).filter(Contact.linkedId == primary.id)
+        for contact in linked:
+            if contact.email not in emailList:
+                emailList.append(contact.email)
+            if contact.phoneNumber not in phoneList:
+                phoneList.append(contact.phoneNumber)
+            secondaryContactIds.append(contact.id)
 
     # Return JSON response
     return JSONResponse({"contact": {"primaryContactId": primaryID, "emails": emailList, "phoneNumbers": phoneList, "secondaryContactIds": secondaryContactIds}})
