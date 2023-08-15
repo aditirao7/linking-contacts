@@ -104,26 +104,21 @@ async def identify(info: Request):
             Contact.phoneNumber == phoneNumber)
         emailChainSize = emailChain.count()
         phoneChainSize = phoneChain.count()
-        print(emailChainSize, phoneChainSize)
 
         # Both New: Insert as primary (CREATE)
         if emailChainSize == 0 and phoneChainSize == 0:
-            print(1)
             primary = addContact(phoneNumber, email, None, 'primary')
 
         # New Email: Insert and Link to chain with same phone number (CREATE)
         elif emailChainSize == 0 and phoneChainSize != 0:
-            print(2)
             primary = eitherPhoneOrEmailIsNew(phoneChain, phoneNumber, email)
 
         # New Phone: Insert and Link to chain with same email (CREATE)
         elif emailChainSize != 0 and phoneChainSize == 0:
-            print(3)
             primary = eitherPhoneOrEmailIsNew(emailChain, phoneNumber, email)
 
         # Both Seen: Email and phone chains need to be linked, one chain is changed to all secondary by comparing ID (UPDATE)
         else:
-            print(4)
             phonePrimary = findPrimaryFromChain(phoneChain)
             emailPrimary = findPrimaryFromChain(emailChain)
             # Phone primary is actual primary
@@ -138,21 +133,17 @@ async def identify(info: Request):
     # Seen Email/ Phone: Find all linked contacts and output (READ)
     else:
         if email:
-            print(5)
             linked = db.query(Contact).filter(Contact.email == email)
             primary = findPrimaryFromLinked(linked)
         elif phoneNumber:
-            print(6)
             linked = db.query(Contact).filter(
                 Contact.phoneNumber == phoneNumber)
             primary = findPrimaryFromLinked(linked)
         else:
-            print(7)
             return JSONResponse({"message": "Invalid Request!"})
 
     # Populate output lists
     if primary:
-        print(8)
         updateOutput(primary, emailList, phoneList, primaryID)
         linked = db.query(Contact).filter(Contact.linkedId == primary.id)
         for contact in linked:
