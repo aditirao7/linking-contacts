@@ -14,7 +14,7 @@ async def root():
 
 @app.post("/identify")
 async def identify(info: Request):
-    req_info = info.json()
+    req_info = await info.json()
 
     email = req_info['email']
     phoneNumber = req_info['phoneNumber']
