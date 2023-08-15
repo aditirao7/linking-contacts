@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from models import SessionLocal, Contact
+from sqlalchemy import or_
 from datetime import datetime
 
 app = FastAPI()
@@ -27,6 +28,16 @@ async def identify(info: Request):
     db.add(newContact)
     db.commit()
     db.refresh(newContact)
+
+    # Checking if primary matches given input
+    primary = db.query(Contact).filter(or_(Contact.email == email, Contact.phoneNumber ==
+                                           phoneNumber), Contact.linkPrecedence == 'primary').first()
+    if primary is None:
+        newContact.linkedId = primary.id
+        newContact.linkPrecedence = 'secondary'
+        newContact.updatedAt = datetime.now()
+        db.add(newContact)
+        db.commit()
 
     emailList = []
     phoneList = []
