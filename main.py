@@ -143,6 +143,11 @@ async def identify(info: Request):
             return JSONResponse({"message": "Invalid Request!"})
 
     # Populate output lists
+    linked = db.query(Contact).filter(Contact.linkedId == primary.id)
+    for contact in linked:
+        emailList.append(contact.email)
+        phoneList.append(contact.phoneNumber)
+        secondaryContactIds.append(contact.id)
 
     # Return JSON response
     return JSONResponse({"contact": {"primaryContactId": primaryID, "emails": emailList, "phoneNumbers": phoneList, "secondaryContactIds": secondaryContactIds}})
