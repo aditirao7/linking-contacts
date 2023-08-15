@@ -73,7 +73,22 @@ async def identify(info: Request):
 
         # New Phone: Insert and Link to chain with same email (CREATE)
         if emailChainSize != 0 and phoneChainSize == 0:
-            print(3)
+            # Check if primary exists in chain
+            primary = emailChain.filter(
+                Contact.linkPrecedence == 'primary').first()
+            # Else get primary from linkedId
+            if primary is None:
+                primary = db.query(Contact).filter(
+                    Contact.id == emailChain.first().linkedId).first()
+            # Insert
+            newContact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': primary.id,
+                                    'linkPrecedence': 'secondary', 'createdAt': datetime.now(), 'updatedAt': datetime.now()})
+            db.add(newContact)
+            db.commit()
+            db.refresh(newContact)
+            emailList.append(primary.email)
+            phoneList.append(primary.phoneNumber)
+            primaryID = primary.id
 
         # Both Seen: Email and phone chains need to be linked, one chain is changed to all secondary by comparing ID (UPDATE)
         else:
