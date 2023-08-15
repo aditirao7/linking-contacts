@@ -92,7 +92,31 @@ async def identify(info: Request):
 
         # Both Seen: Email and phone chains need to be linked, one chain is changed to all secondary by comparing ID (UPDATE)
         else:
-            print(4)
+            phonePrimary = phoneChain.filter(
+                Contact.linkPrecedence == 'primary').first()
+            emailPrimary = emailChain.filter(
+                Contact.linkPrecedence == 'primary').first()
+            # Phone primary is actual primary
+            if phonePrimary.id < emailPrimary.id:
+                for contact in emailChain:
+                    contact.linkedId = phonePrimary.id
+                    contact.updatedAt = datetime.now()
+                    contact.linkPrecedence = 'secondary'
+                    db.add(contact)
+                db.commit()
+                primary = phonePrimary
+            # Email primary is actual primary
+            else:
+                for contact in phoneChain:
+                    contact.linkedId = emailPrimary.id
+                    contact.updatedAt = datetime.now()
+                    contact.linkPrecedence = 'secondary'
+                    db.add(contact)
+                db.commit()
+                primary = emailPrimary
+            emailList.append(primary.email)
+            phoneList.append(primary.phoneNumber)
+            primaryID = primary.id
 
         # Insert contact only if either phone or email is new
         # newContact = Contact(**{'phoneNumber': phoneNumber, 'email': email, 'linkedId': None,
