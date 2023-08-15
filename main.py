@@ -54,9 +54,11 @@ async def identify(info: Request):
 
         # New Email: Insert and Link to chain with same phone number (CREATE)
         if emailChainSize == 0 and phoneChainSize != 0:
-            print(2)
+            # Insert
+            # Check if primary exists in chain
+            # Else get primary from linkedId
 
-        # New Phone: Insert and Link to chain with same email (CREATE)
+            # New Phone: Insert and Link to chain with same email (CREATE)
         if emailChainSize != 0 and phoneChainSize == 0:
             print(3)
 
