@@ -65,14 +65,16 @@ def findPrimaryFromLinked(linked):
     return primary
 
 
-def updateChain(chain, primary):
+def updateChain(actualPrimary, oldPrimary):
+    chain = db.query(Contact).filter(
+        or_(Contact.id == oldPrimary.id, Contact.linkedId == oldPrimary.id))
     for contact in chain:
-        contact.linkedId = primary.id
+        contact.linkedId = actualPrimary.id
         contact.updatedAt = datetime.now()
         contact.linkPrecedence = 'secondary'
         db.add(contact)
     db.commit()
-    return primary
+    return actualPrimary
 
 
 @app.post("/identify")
@@ -121,12 +123,13 @@ async def identify(info: Request):
         else:
             phonePrimary = findPrimaryFromChain(phoneChain)
             emailPrimary = findPrimaryFromChain(emailChain)
+            print(phonePrimary.id, emailPrimary.id)
             # Phone primary is actual primary
             if phonePrimary.id < emailPrimary.id:
-                primary = updateChain(emailChain, phonePrimary)
+                primary = updateChain(phonePrimary, emailPrimary)
             # Email primary is actual primary
             elif phonePrimary.id > emailPrimary.id:
-                primary = updateChain(phoneChain, emailPrimary)
+                primary = updateChain(emailPrimary, phonePrimary)
             else:
                 primary = emailPrimary
 
