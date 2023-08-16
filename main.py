@@ -123,7 +123,6 @@ async def identify(info: Request):
         else:
             phonePrimary = findPrimaryFromChain(phoneChain)
             emailPrimary = findPrimaryFromChain(emailChain)
-            print(phonePrimary.id, emailPrimary.id)
             # Phone primary is actual primary
             if phonePrimary.id < emailPrimary.id:
                 primary = updateChain(phonePrimary, emailPrimary)
